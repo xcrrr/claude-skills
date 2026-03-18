@@ -1,0 +1,274 @@
+#!/usr/bin/env python3
+"""
+validate_skills.py — Validates all SKILL.md files in the skills/ directory.
+
+Checks:
+  - YAML frontmatter presence and required fields
+  - All 10 required sections present and in the correct order
+  - Examples section contains at least 2 examples
+  - Exits with code 1 if any validation fails
+"""
+
+import os
+import re
+import sys
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+SKILLS_ROOT = Path(__file__).parent.parent / "skills"
+
+REQUIRED_FRONTMATTER_FIELDS = ["name", "description", "version", "author", "tags", "license"]
+
+REQUIRED_SECTIONS = [
+    "Overview",
+    "When to Use",
+    "When NOT to Use",
+    "Quick Reference",
+    "Instructions",
+    "Examples",
+    "Best Practices",
+    "Common Mistakes",
+    "Tips & Tricks",
+    "Related Skills",
+]
+
+# Minimum number of "### Example N" subsections required inside ## Examples
+MIN_EXAMPLES = 2
+
+# ---------------------------------------------------------------------------
+# Parsing helpers
+# ---------------------------------------------------------------------------
+
+
+def extract_frontmatter(text: str) -> tuple[dict, str]:
+    """
+    Extract YAML frontmatter from a Markdown file.
+
+    Returns (fields_dict, body_text). fields_dict is empty if no frontmatter found.
+    Performs simple line-by-line parsing to avoid a PyYAML dependency.
+    """
+    if not text.startswith("---"):
+        return {}, text
+
+    end = text.find("\n---", 3)
+    if end == -1:
+        return {}, text
+
+    raw = text[3:end].strip()
+    body = text[end + 4:]
+
+    fields: dict = {}
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if ":" in line:
+            key, _, value = line.partition(":")
+            key = key.strip()
+            value = value.strip()
+            # Strip inline quotes
+            if (value.startswith('"') and value.endswith('"')) or \
+               (value.startswith("'") and value.endswith("'")):
+                value = value[1:-1]
+            # Detect list values (starts with "[")
+            if value.startswith("["):
+                inner = value.strip("[]")
+                items = [v.strip().strip('"').strip("'") for v in inner.split(",") if v.strip()]
+                fields[key] = items
+            else:
+                fields[key] = value
+
+    return fields, body
+
+
+def extract_sections(body: str) -> dict[str, str]:
+    """
+    Parse ## Level-2 headings and return a mapping of heading text -> section content.
+    """
+    sections: dict[str, str] = {}
+    pattern = re.compile(r"^## (.+)$", re.MULTILINE)
+    matches = list(pattern.finditer(body))
+
+    for i, match in enumerate(matches):
+        heading = match.group(1).strip()
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
+        sections[heading] = body[start:end].strip()
+
+    return sections
+
+
+def count_examples(examples_body: str) -> int:
+    """Count ### Example subsections within the Examples section body."""
+    return len(re.findall(r"^###\s+Example", examples_body, re.MULTILINE | re.IGNORECASE))
+
+
+# ---------------------------------------------------------------------------
+# Validation logic
+# ---------------------------------------------------------------------------
+
+
+class ValidationResult:
+    def __init__(self, path: Path):
+        self.path = path
+        self.errors: list[str] = []
+
+    def fail(self, msg: str) -> None:
+        self.errors.append(msg)
+
+    @property
+    def passed(self) -> bool:
+        return len(self.errors) == 0
+
+
+def validate_file(skill_md: Path) -> ValidationResult:
+    result = ValidationResult(skill_md)
+    text = skill_md.read_text(encoding="utf-8")
+
+    # ------------------------------------------------------------------
+    # 1. Frontmatter
+    # ------------------------------------------------------------------
+    fields, body = extract_frontmatter(text)
+
+    if not fields:
+        result.fail("Missing YAML frontmatter (file must start with ---)")
+    else:
+        for field in REQUIRED_FRONTMATTER_FIELDS:
+            if field not in fields or not fields[field]:
+                result.fail(f"Frontmatter missing required field: '{field}'")
+
+        # tags must be a list
+        if "tags" in fields and not isinstance(fields["tags"], list):
+            result.fail("Frontmatter 'tags' must be a list (e.g. [\"tag1\", \"tag2\"])")
+
+        # license must be MIT
+        if "license" in fields and fields.get("license", "").upper() != "MIT":
+            result.fail(f"Frontmatter 'license' must be 'MIT', got: '{fields.get('license')}'")
+
+        # version must look like semver
+        version = fields.get("version", "")
+        if version and not re.match(r"^\d+\.\d+\.\d+$", version):
+            result.fail(f"Frontmatter 'version' must be semver (e.g. 1.0.0), got: '{version}'")
+
+    # ------------------------------------------------------------------
+    # 2. Required sections — presence
+    # ------------------------------------------------------------------
+    sections = extract_sections(body)
+
+    for section in REQUIRED_SECTIONS:
+        if section not in sections:
+            result.fail(f"Missing required section: '## {section}'")
+
+    # ------------------------------------------------------------------
+    # 3. Required sections — correct order
+    # ------------------------------------------------------------------
+    present_sections = [s for s in REQUIRED_SECTIONS if s in sections]
+    section_positions: dict[str, int] = {}
+    for section in present_sections:
+        pattern = re.compile(rf"^## {re.escape(section)}$", re.MULTILINE)
+        m = pattern.search(body)
+        if m:
+            section_positions[section] = m.start()
+
+    ordered_positions = [section_positions[s] for s in present_sections if s in section_positions]
+    if ordered_positions != sorted(ordered_positions):
+        result.fail("Required sections are out of order. Expected order: " +
+                    ", ".join(REQUIRED_SECTIONS))
+
+    # ------------------------------------------------------------------
+    # 4. Examples section — minimum count
+    # ------------------------------------------------------------------
+    if "Examples" in sections:
+        n = count_examples(sections["Examples"])
+        if n < MIN_EXAMPLES:
+            result.fail(
+                f"'## Examples' must contain at least {MIN_EXAMPLES} '### Example' subsections, "
+                f"found {n}"
+            )
+
+    # ------------------------------------------------------------------
+    # 5. Instructions section — must contain at least one {{variable}} or non-trivial content
+    # ------------------------------------------------------------------
+    if "Instructions" in sections:
+        instructions_body = sections["Instructions"]
+        if len(instructions_body.strip()) < 50:
+            result.fail("'## Instructions' section appears too short (< 50 characters). "
+                        "Provide a complete prompt template.")
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Scanner
+# ---------------------------------------------------------------------------
+
+
+def find_skill_files(root: Path) -> list[Path]:
+    """Recursively find all SKILL.md files under root."""
+    return sorted(root.rglob("SKILL.md"))
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+
+def main() -> int:
+    print("=" * 60)
+    print("claude-skills validator")
+    print("=" * 60)
+
+    if not SKILLS_ROOT.exists():
+        print(f"\n[ERROR] Skills directory not found: {SKILLS_ROOT}")
+        return 1
+
+    skill_files = find_skill_files(SKILLS_ROOT)
+
+    if not skill_files:
+        print("\n[WARN] No SKILL.md files found. Nothing to validate.")
+        return 0
+
+    print(f"\nFound {len(skill_files)} SKILL.md file(s) to validate.\n")
+
+    results: list[ValidationResult] = []
+    for skill_file in skill_files:
+        result = validate_file(skill_file)
+        results.append(result)
+
+        relative = skill_file.relative_to(SKILLS_ROOT.parent)
+        status = "✅ PASS" if result.passed else "❌ FAIL"
+        print(f"  {status}  {relative}")
+
+        for error in result.errors:
+            print(f"           └─ {error}")
+
+    # ------------------------------------------------------------------
+    # Summary
+    # ------------------------------------------------------------------
+    passed = [r for r in results if r.passed]
+    failed = [r for r in results if not r.passed]
+
+    print()
+    print("=" * 60)
+    print(f"Results: {len(passed)} passed, {len(failed)} failed out of {len(results)} total")
+    print("=" * 60)
+
+    if failed:
+        print("\nFailed files:")
+        for r in failed:
+            relative = r.path.relative_to(SKILLS_ROOT.parent)
+            print(f"  • {relative}")
+            for error in r.errors:
+                print(f"      - {error}")
+        print()
+        return 1
+
+    print("\nAll skills passed validation! 🎉")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
