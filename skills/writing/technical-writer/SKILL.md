@@ -124,15 +124,15 @@ This skill produces clear, accurate, and immediately usable technical documentat
 
 ---
 
-## POST /users/invite
+#### POST /users/invite
 
 Sends an invitation email and creates a pending invitation record for the specified user.
 
-### Authentication
+##### Authentication
 
 Requires a valid Bearer token in the `Authorization` header.
 
-### Request
+##### Request
 
 **Headers:**
 
@@ -162,9 +162,7 @@ curl -X POST https://api.example.com/users/invite \
   }'
 ```
 
-### Response
-
-**Success — 201 Created:**
+##### Response
 
 ```json
 {
@@ -210,7 +208,7 @@ curl -X POST https://api.example.com/users/invite \
 
 `deployctl` is the command-line interface for managing deployments from your terminal.
 
-## Prerequisites
+#### Prerequisites
 
 - **Node.js 18 or higher** — check your version with:
   ```bash
@@ -223,7 +221,7 @@ curl -X POST https://api.example.com/users/invite \
 - **npm 8 or higher** (included with Node 18)
 - An active account at [app.example.com](https://app.example.com)
 
-## Installation
+#### Installation
 
 Install `deployctl` globally with npm:
 
@@ -238,7 +236,7 @@ deployctl --version
 # Expected output: deployctl/2.1.0 linux-x64 node-v18.19.0
 ```
 
-## Authentication
+#### Authentication
 
 Log in to connect the CLI to your account:
 
@@ -260,7 +258,7 @@ deployctl auth login --token YOUR_API_TOKEN
 
 Generate an API token at **Settings → API Tokens** in the dashboard.
 
-## Verify Your Setup
+#### Verify Your Setup
 
 Run a quick check to confirm everything is connected:
 
@@ -270,7 +268,7 @@ deployctl status
 
 You should see your account details and available projects.
 
-## Troubleshooting
+#### Troubleshooting
 
 **`command not found: deployctl` after installation**
 Your npm global bin directory isn't in your PATH. Find it with `npm bin -g`, then add it to your shell profile:
@@ -289,7 +287,7 @@ export PATH=~/.npm-global/bin:$PATH
 **Authentication window doesn't open**
 Copy the URL printed in the terminal and open it manually in your browser.
 
-## Next Steps
+#### Next Steps
 
 - [Deploy your first project](./first-deployment.md)
 - [Configure environment variables](./env-vars.md)

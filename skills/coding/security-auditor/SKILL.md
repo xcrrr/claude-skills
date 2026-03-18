@@ -25,7 +25,7 @@ The Security Auditor skill provides a structured approach to identifying securit
 - Infrastructure security (cloud IAM policies, container security)
 - Compliance audits (SOC2, HIPAA, PCI-DSS) — these require human auditors
 
-## Quick Reference — OWASP Top 10 (2021)
+## Quick Reference
 | # | Category | Key Check |
 |---|----------|-----------|
 | A01 | Broken Access Control | Is every route/endpoint authorization-checked? |

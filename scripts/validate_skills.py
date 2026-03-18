@@ -84,18 +84,61 @@ def extract_frontmatter(text: str) -> tuple[dict, str]:
     return fields, body
 
 
+def _mask_code_blocks(text: str) -> str:
+    """
+    Replace the content of fenced code blocks with spaces, preserving character positions.
+
+    This prevents headings inside code blocks (e.g. inside a ```markdown example) from
+    being mistakenly detected as section headings by the section parser.
+    Handles both backtick (```) and tilde (~~~) fences, including 4-backtick fences.
+    """
+    result = list(text)
+    lines = text.split("\n")
+    pos = 0
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+
+    for line in lines:
+        line_end = pos + len(line)
+        if not in_fence:
+            m = re.match(r"^(`{3,}|~{3,})", line)
+            if m:
+                in_fence = True
+                fence_char = m.group(1)[0]
+                fence_len = len(m.group(1))
+        else:
+            m = re.match(r"^(`{3,}|~{3,})\s*$", line)
+            if m and m.group(1)[0] == fence_char and len(m.group(1)) >= fence_len:
+                in_fence = False
+                fence_char = ""
+                fence_len = 0
+            else:
+                # Mask this line's non-newline characters so headings inside
+                # code blocks are not detected by the section regex.
+                for i in range(pos, line_end):
+                    result[i] = " "
+        pos = line_end + 1  # +1 for the newline character
+
+    return "".join(result)
+
+
 def extract_sections(body: str) -> dict[str, str]:
     """
     Parse ## Level-2 headings and return a mapping of heading text -> section content.
+
+    Headings that appear inside fenced code blocks are ignored.
     """
     sections: dict[str, str] = {}
+    masked = _mask_code_blocks(body)
     pattern = re.compile(r"^## (.+)$", re.MULTILINE)
-    matches = list(pattern.finditer(body))
+    matches = list(pattern.finditer(masked))
 
     for i, match in enumerate(matches):
         heading = match.group(1).strip()
         start = match.end()
         end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
+        # Extract content from the original (unmasked) body using positions from masked body
         sections[heading] = body[start:end].strip()
 
     return sections
@@ -167,9 +210,10 @@ def validate_file(skill_md: Path) -> ValidationResult:
     # ------------------------------------------------------------------
     present_sections = [s for s in REQUIRED_SECTIONS if s in sections]
     section_positions: dict[str, int] = {}
+    masked_body = _mask_code_blocks(body)
     for section in present_sections:
         pattern = re.compile(rf"^## {re.escape(section)}$", re.MULTILINE)
-        m = pattern.search(body)
+        m = pattern.search(masked_body)
         if m:
             section_positions[section] = m.start()
 
