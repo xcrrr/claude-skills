@@ -157,6 +157,6 @@ Both articles address remote work productivity but reach opposite conclusions ba
 
 ## Related Skills
 - [literature-reviewer](../../research/literature-reviewer/SKILL.md)
-- [note-taker](../../productivity/note-taker/SKILL.md)
 - [web-researcher](../../research/web-researcher/SKILL.md)
+- [fact-checker](../../research/fact-checker/SKILL.md)
 - [proofreader](../../writing/proofreader/SKILL.md)
