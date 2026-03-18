@@ -12,7 +12,7 @@
 
 ## What is this?
 
-**claude-skills** is a curated, community-driven library of structured prompt skills designed to unlock the full potential of Claude across dozens of professional domains. Each skill is a battle-tested prompt template with clear instructions, real-world examples, and best practices so you can get expert-level results from Claude without starting from scratch. Whether you're a developer, writer, data analyst, or business professional, this library gives you a plug-and-play toolkit to supercharge your workflow.
+**xcrrr/claude-skills** is a curated, community-driven library of structured prompt skills designed to unlock the full potential of Claude across dozens of professional domains. Each skill is a battle-tested prompt template with clear instructions, real-world examples, and best practices so you can get expert-level results from Claude without starting from scratch. Whether you're a developer, writer, data analyst, or business professional, this library gives you a plug-and-play toolkit to supercharge your workflow.
 
 ---
 
