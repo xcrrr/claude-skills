@@ -169,4 +169,3 @@ What Employees Kept | Right to file PAGA (Private Attorneys General Act) represe
 ## Related Skills
 - [contract-reviewer](../contract-reviewer/SKILL.md)
 - [terms-of-service](../terms-of-service/SKILL.md)
-- [summarizer](../../productivity/summarizer/SKILL.md)
