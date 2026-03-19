@@ -1,0 +1,32 @@
+name: Validate Skills
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run skill validator
+        run: python scripts/validate_skills.py
+
+      - name: Check README is up to date
+        run: |
+          python scripts/generate_readme.py
+          git diff --exit-code README.md || (echo "ERROR: README.md is out of date. Run 'python scripts/generate_readme.py' locally and commit the result." && exit 1)

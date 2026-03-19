@@ -285,4 +285,4 @@ jobs:
 - [docker-expert](../docker-expert/SKILL.md)
 - [kubernetes-helper](../kubernetes-helper/SKILL.md)
 - [monitoring-setup](../monitoring-setup/SKILL.md)
-- [security-auditor](../security-auditor/SKILL.md)
+- [security-auditor](../../coding/security-auditor/SKILL.md)

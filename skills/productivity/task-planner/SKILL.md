@@ -200,5 +200,5 @@ This skill transforms fuzzy goals, messy to-do lists, and overwhelming projects 
 ## Related Skills
 - [note-taker](../note-taker/SKILL.md)
 - [decision-maker](../decision-maker/SKILL.md)
-- [okr-planner](../okr-planner/SKILL.md)
-- [meeting-facilitator](../meeting-facilitator/SKILL.md)
+- [okr-planner](../../business/okr-planner/SKILL.md)
+- [meeting-facilitator](../../business/meeting-facilitator/SKILL.md)

@@ -163,4 +163,4 @@ Apply progressive disclosure: show the most important 3 metrics prominently, the
 - [ux-writer](../ux-writer/SKILL.md)
 - [frontend-design](../frontend-design/SKILL.md)
 - [color-palette](../color-palette/SKILL.md)
-- [ux-researcher](../../research/ux-researcher/SKILL.md)
+- [ux-researcher](../../business/ux-researcher/SKILL.md)

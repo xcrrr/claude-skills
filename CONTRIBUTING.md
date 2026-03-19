@@ -213,6 +213,6 @@ To improve an existing skill:
 
 ## Questions?
 
-Open a [GitHub Discussion](https://github.com/anthropics/claude-skills/discussions) for questions, ideas, or feedback. For bugs or concrete issues, open an [Issue](https://github.com/anthropics/claude-skills/issues).
+Open a [GitHub Discussion](https://github.com/xcrrr/claude-skills/discussions) for questions, ideas, or feedback. For bugs or concrete issues, open an [Issue](https://github.com/xcrrr/claude-skills/issues).
 
 We're grateful for every contribution — thank you for making claude-skills better! 🙏

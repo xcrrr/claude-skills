@@ -178,6 +178,6 @@ Sleep deprivation is a hidden productivity crisis: it impairs cognition as sever
 
 ## Related Skills
 - [task-planner](../task-planner/SKILL.md)
-- [meeting-facilitator](../meeting-facilitator/SKILL.md)
-- [summarizer](../../writing/summarizer/SKILL.md)
+- [meeting-facilitator](../../business/meeting-facilitator/SKILL.md)
+- [summarizer](../../research/summarizer/SKILL.md)
 - [journaling](../journaling/SKILL.md)

@@ -299,4 +299,4 @@ docker compose down -v
 ## Related Skills
 - [ci-cd-helper](../ci-cd-helper/SKILL.md)
 - [kubernetes-helper](../kubernetes-helper/SKILL.md)
-- [security-auditor](../security-auditor/SKILL.md)
+- [security-auditor](../../coding/security-auditor/SKILL.md)

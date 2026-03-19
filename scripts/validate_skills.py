@@ -13,6 +13,7 @@ import os
 import re
 import sys
 from pathlib import Path
+import yaml
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -45,10 +46,8 @@ MIN_EXAMPLES = 2
 
 def extract_frontmatter(text: str) -> tuple[dict, str]:
     """
-    Extract YAML frontmatter from a Markdown file.
-
+    Extract YAML frontmatter from a Markdown file using PyYAML.
     Returns (fields_dict, body_text). fields_dict is empty if no frontmatter found.
-    Performs simple line-by-line parsing to avoid a PyYAML dependency.
     """
     if not text.startswith("---"):
         return {}, text
@@ -60,26 +59,12 @@ def extract_frontmatter(text: str) -> tuple[dict, str]:
     raw = text[3:end].strip()
     body = text[end + 4:]
 
-    fields: dict = {}
-    for line in raw.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if ":" in line:
-            key, _, value = line.partition(":")
-            key = key.strip()
-            value = value.strip()
-            # Strip inline quotes
-            if (value.startswith('"') and value.endswith('"')) or \
-               (value.startswith("'") and value.endswith("'")):
-                value = value[1:-1]
-            # Detect list values (starts with "[")
-            if value.startswith("["):
-                inner = value.strip("[]")
-                items = [v.strip().strip('"').strip("'") for v in inner.split(",") if v.strip()]
-                fields[key] = items
-            else:
-                fields[key] = value
+    try:
+        fields = yaml.safe_load(raw) or {}
+        if not isinstance(fields, dict):
+            return {}, body
+    except yaml.YAMLError:
+        return {}, body
 
     return fields, body
 
@@ -241,6 +226,18 @@ def validate_file(skill_md: Path) -> ValidationResult:
         if len(instructions_body.strip()) < 50:
             result.fail("'## Instructions' section appears too short (< 50 characters). "
                         "Provide a complete prompt template.")
+
+    # ------------------------------------------------------------------
+    # 6. Related Skills — verify linked files exist
+    # ------------------------------------------------------------------
+    if "Related Skills" in sections:
+        related_body = sections["Related Skills"]
+        link_pattern = re.compile(r'\[.*?\]\((.*?\.md)\)')
+        for match in link_pattern.finditer(related_body):
+            link_path = match.group(1)
+            resolved = (skill_md.parent / link_path).resolve()
+            if not resolved.exists():
+                result.fail(f"Broken link in '## Related Skills': '{link_path}' does not exist")
 
     return result
 

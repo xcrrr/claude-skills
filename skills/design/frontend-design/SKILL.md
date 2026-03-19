@@ -292,4 +292,4 @@ Mobile (<640px):
 - [ux-writer](../ux-writer/SKILL.md)
 - [design-critiquer](../design-critiquer/SKILL.md)
 - [color-palette](../color-palette/SKILL.md)
-- [api-designer](../../engineering/api-designer/SKILL.md)
+- [api-designer](../../coding/api-designer/SKILL.md)
