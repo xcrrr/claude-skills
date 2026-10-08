@@ -1,7 +1,7 @@
 ---
 name: data-cleaner
 description: "Use this skill when preparing raw data for analysis—handling missing values, removing duplicates, fixing data types, resolving inconsistent formats, or filtering outliers. Trigger phrases: 'clean this data', 'fix the missing values', 'standardize these dates', 'deduplicate this dataset', 'the data has formatting issues'. Not for designing database schemas, building ETL pipelines for production systems, or statistical modeling."
-version: 1.0.0
+version: 1.0.1
 author: community
 tags: [data, cleaning, preprocessing, pandas]
 license: MIT
@@ -49,7 +49,8 @@ Always understand what you have before changing anything.
 import pandas as pd
 import numpy as np
 
-df = pd.read_csv("raw_data.csv")
+raw_df = pd.read_csv("raw_data.csv", dtype="string", keep_default_na=False)
+df = raw_df.replace("", pd.NA)  # This example treats only empty cells as missing.
 
 # Overview
 print("Shape:", df.shape)
@@ -66,18 +67,19 @@ print("\nMissing values:\n", missing_report[missing_report['count'] > 0])
 print(f"\nDuplicate rows: {df.duplicated().sum()}")
 
 # Unique values in categoricals
-for col in df.select_dtypes(include='object').columns:
+for col in df.select_dtypes(include=['object', 'string']).columns:
     n_unique = df[col].nunique()
     print(f"{col}: {n_unique} unique values — {df[col].unique()[:5]}")
 ```
 
 ### Step 2: Handle Missing Values
-Choose the right strategy based on missingness type and business context.
+Choose the right strategy based on missingness type and business context. The fragments are alternatives for working columns with declared types and missing markers.
 
 ```python
 # Strategy 1: Drop rows with too many missing values (>50% missing)
 threshold = 0.5
-df = df.dropna(thresh=int(threshold * len(df.columns)))
+from math import ceil
+df = df.dropna(thresh=ceil((1 - threshold) * len(df.columns)))
 
 # Strategy 2: Drop columns with very high missingness
 df = df.drop(columns=df.columns[df.isnull().mean() > 0.8])
@@ -87,9 +89,12 @@ num_cols = df.select_dtypes(include='number').columns
 df[num_cols] = df[num_cols].fillna(df[num_cols].median())
 
 # Strategy 4: Fill categorical with mode
-cat_cols = df.select_dtypes(include='object').columns
+cat_cols = df.select_dtypes(include=['object', 'string']).columns
 for col in cat_cols:
-    df[col] = df[col].fillna(df[col].mode()[0])
+    modes = df[col].mode()
+    if not modes.empty:
+        df[col] = df[col].fillna(modes.iloc[0])
+    # Otherwise retain missingness or use an explicitly authorized sentinel.
 
 # Strategy 5: Fill with a sentinel value (flag the missingness)
 df['revenue_missing'] = df['revenue'].isnull().astype(int)
@@ -126,11 +131,24 @@ print(f"Rows after dedup: {df.shape[0]}")
 ### Step 4: Fix Data Types
 ```python
 # Convert numeric columns that were read as strings
-df['revenue'] = pd.to_numeric(df['revenue'], errors='coerce')
+revenue_source = df['revenue'].copy()
+revenue_missing = revenue_source.isna() | revenue_source.eq('')
+df['revenue'] = pd.to_numeric(revenue_source, errors='coerce')
+revenue_invalid = ~revenue_missing & df['revenue'].isna()
 df['quantity'] = df['quantity'].astype(int)
 
 # Parse dates — handle mixed formats
-df['order_date'] = pd.to_datetime(df['order_date'], infer_datetime_format=True, errors='coerce')
+date_source = df['order_date'].copy()
+date_missing = date_source.isna() | date_source.eq('')
+parts = date_source.astype('string').str.extract(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})$')
+first = pd.to_numeric(parts[0], errors='coerce')
+second = pd.to_numeric(parts[1], errors='coerce')
+date_ambiguous = (first.between(1, 12) & second.between(1, 12) & first.ne(second)).fillna(False)
+df['order_date'] = pd.to_datetime(
+    date_source.mask(date_missing | date_ambiguous), format='mixed', errors='coerce'
+)
+date_invalid = ~date_missing & ~date_ambiguous & df['order_date'].isna()
+# Resolve ambiguous formats only under a declared schema; preserve the mask.
 
 # Boolean columns
 df['is_active'] = df['is_active'].map({'Yes': True, 'No': False, '1': True, '0': False})
@@ -144,8 +162,8 @@ print("Unparseable dates:", df['order_date'].isnull().sum())
 
 ### Step 5: Standardize String/Format Inconsistencies
 ```python
-# Basic normalization: strip whitespace, lowercase
-for col in df.select_dtypes(include='object').columns:
+# Normalize only these case-insensitive fields; preserve other lexical text.
+for col in ['country', 'email']:
     df[col] = df[col].str.strip().str.lower()
 
 # Fix specific column
@@ -241,24 +259,42 @@ validate_dataset(df)
 import pandas as pd
 import numpy as np
 
-df = pd.read_csv("sales_raw.csv")
+raw_df = pd.read_csv("sales_raw.csv", dtype="string", keep_default_na=False)
+df = raw_df.copy()
+revenue_missing = df['revenue'].eq('')
+df['revenue'] = pd.to_numeric(df['revenue'], errors='coerce')
+revenue_invalid = ~revenue_missing & df['revenue'].isna()
 print(f"Before: {df.shape[0]} rows, {df.isnull().sum().sum()} nulls")
 
 # Fix region inconsistency
 df['region'] = df['region'].str.strip().str.title()
 
 # Fix dates
-df['order_date'] = pd.to_datetime(df['order_date'], infer_datetime_format=True, errors='coerce')
+date_source = df['order_date'].copy()
+date_missing = date_source.eq('')
+parts = date_source.astype('string').str.extract(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})$')
+first = pd.to_numeric(parts[0], errors='coerce')
+second = pd.to_numeric(parts[1], errors='coerce')
+date_ambiguous = (first.between(1, 12) & second.between(1, 12) & first.ne(second)).fillna(False)
+df['order_date'] = pd.to_datetime(
+    date_source.mask(date_missing | date_ambiguous), format='mixed', errors='coerce'
+)
+date_invalid = ~date_missing & ~date_ambiguous & df['order_date'].isna()
+# Resolve ambiguous formats only under the actual declared date policy.
 bad_dates = df['order_date'].isnull().sum()
 if bad_dates > 0:
     print(f"Warning: {bad_dates} dates could not be parsed — review these rows")
 
-# Handle missing revenue: flag and fill with median
-df['revenue_missing'] = df['revenue'].isnull().astype(int)
-df['revenue'] = df['revenue'].fillna(df['revenue'].median())
+# Handle genuinely missing revenue; retain invalid amounts separately.
+df['revenue_missing'] = revenue_missing.astype(int)
+df['revenue_invalid'] = revenue_invalid.astype(int)
+df.loc[revenue_missing, 'revenue'] = df['revenue'].median()
+df['order_date_missing'] = date_missing.astype(int)
+df['order_date_invalid'] = date_invalid.astype(int)
+df['order_date_ambiguous'] = date_ambiguous.astype(int)
 
-# Remove full duplicates
-df = df.drop_duplicates()
+# Remove raw exact duplicates, not observations that became equal after cleaning.
+df = df.loc[~raw_df.duplicated()].copy()
 
 print(f"After: {df.shape[0]} rows, {df.isnull().sum().sum()} nulls")
 df.to_csv("sales_clean.csv", index=False)
@@ -270,7 +306,7 @@ Before: 5,240 rows, 786 nulls
 Warning: 12 dates could not be parsed — review these rows
 After: 5,214 rows, 12 nulls (unparseable dates only)
 ```
-The dataset is now ready for analysis with a `revenue_missing` flag for downstream filtering.
+The sample counts are illustrative. Keep the missing/invalid/ambiguous flags for downstream review; invalid values were not imputed. Validate the result against the actual analysis schema before use.
 
 ---
 
@@ -286,13 +322,14 @@ raw_dates = pd.Series([
     "01-15-2023"
 ])
 
-# pandas infer_datetime_format handles most common formats
-parsed = pd.to_datetime(raw_dates, infer_datetime_format=True, errors='coerce')
-
-# For the tricky ones, try dayfirst=True fallback
-mask = parsed.isnull()
-if mask.any():
-    parsed[mask] = pd.to_datetime(raw_dates[mask], dayfirst=True, errors='coerce')
+# This example declares an exact format for each corresponding raw value.
+formats = ['%Y-%m-%d', '%b %d, %Y', '%d/%m/%Y', '%Y%m%d', '%m-%d-%Y']
+parsed = pd.Series([
+    pd.to_datetime(value, format=fmt, errors='coerce')
+    for value, fmt in zip(raw_dates, formats)
+])
+# In a real mixed column, select formats from its declared schema.
+# An unresolved day/month value is ambiguous; do not guess a fallback.
 
 # Standardize to ISO 8601
 standardized = parsed.dt.strftime('%Y-%m-%d')
@@ -315,7 +352,7 @@ All five formats normalized to `YYYY-MM-DD`.
 - Document every cleaning decision with a comment explaining the business rationale
 - Run a before/after row count and null count to confirm changes had expected effect
 - Separate the cleaning script from the analysis script—cleaning is a distinct step
-- Use `errors='coerce'` when casting types; it creates NaN instead of crashing
+- Use `errors='coerce'` only with separate raw missing/invalid masks and reported conversion failures; do not silently collapse malformed values into missingness
 - Keep the original raw file untouched; write cleaned output to a new file
 - Add validation assertions at the end of the pipeline to catch regressions
 
